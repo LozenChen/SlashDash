@@ -1,0 +1,6 @@
+- Name: SlashDash
+  Version: 1.0.2
+  DLL: bin/Release/net7.0/SlashDash.dll
+  Dependencies:
+    - Name: Everest
+      Version: 1.4961
