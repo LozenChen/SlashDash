@@ -9,19 +9,23 @@ public class SlashDashSettings : EverestModuleSettings {
         Instance = this;
     }
 
+    public void Initialize() {
+        ExSlash.BaseGenerationRate = GenerationRate * 0.01f;
+        ExSlash.MaxNextGenerationCount = MaxNextGenerationCount;
+    }
+
     public bool Enabled { get; set; } = true;
 
     [SettingRange(1, 40)]
     public int MainSlashLength { get; set; } = 10;
 
-    public int generationRate = 30;
+    public int generationRate = 70;
 
-    [SettingRange(1, 90)]
-    public int GenerationRate { get => generationRate; set { generationRate = value; f_GenerationRate = value * 0.01f; } }
+    [SettingRange(0, 99)]
+    public int GenerationRate { get => generationRate; set { generationRate = value; ExSlash.BaseGenerationRate = value * 0.01f; } }
 
+    public int maxNextGenerationCount = 5;
 
-    [SettingRange(1, 5)]
-    public int MaxNextGenerationCount { get; set; } = 3;
-
-    public float f_GenerationRate = 0.6f;
+    [SettingRange(0, 50)]
+    public int MaxNextGenerationCount { get => maxNextGenerationCount; set { maxNextGenerationCount = value; ExSlash.MaxNextGenerationCount = value; } }
 }

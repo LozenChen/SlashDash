@@ -24,6 +24,7 @@ public class SlashDashModule : EverestModule {
 
     private void Level_OnLoadLevel(Level level, Player.IntroTypes playerIntro, bool isFromLoader) {
         ExSlash.LivingSlashes = 0;
+        ExSlash.DashCount = 0;
     }
 
     public override void Unload() {
@@ -34,6 +35,12 @@ public class SlashDashModule : EverestModule {
     public override void Initialize() {
         typeof(Player).GetMethod("DashCoroutine", BindingFlags.NonPublic | BindingFlags.Instance).GetStateMachineTarget().IlHook(IL_Player_DashCoroutine);
     }
+
+    public override void LoadSettings() {
+        base.LoadSettings();
+        SlashDashSettings.Instance.Initialize();
+    }
+
     private void IL_Player_DashCoroutine(ILContext il) {
         ILCursor cursor = new ILCursor(il);
         bool success = false;
@@ -74,6 +81,7 @@ public class SlashDashModule : EverestModule {
         if (!SlashDashModule.Settings.Enabled) {
             return;
         }
+        ExSlash.DashCount++;
         // ExSlash.Burst(player.Position + player.Speed * Engine.DeltaTime * Rand.Rnd.Range(10f, 20f) + player.Speed.Rotate(MathF.PI/2f) * Engine.DeltaTime * Rand.Rnd.Range(-2f, 2f), player.DashDir.Angle() + MathF.PI / 2f + Rand.Rnd.Range(-0.5f, 0.5f), Rand.GetColor(400), Rand.Rnd.Range(0.1f, 0.3f) * SlashDashModule.Settings.MainSlashLength, Rand.Rnd.Range(0.05f, 0.5f), Rand.Rnd.Range(6f, 30f));
         ExSlash.ExplosiveRandBurst(player.Position, player.Speed.Length());
     }

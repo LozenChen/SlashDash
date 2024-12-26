@@ -19,23 +19,33 @@ public class ExSlash : Entity {
 
     public int Generation;
 
+    public Vector2 BasePosition;
+
+    public int BaseDashCount;
+
     public static int LivingSlashes = 0;
 
-    public static int MaxCapacity = 2000;
+    public static int MaxCapacity = 4000; // don't set it above 20000
+
+    public static float MinDelay = 0.05f;
+
+    public static float MaxDelay = 0.7f;
     public ExSlash() {
-        LivingSlashes++;
         Add(Sprite = new Sprite(GFX.Game, "effects/slash/"));
         Sprite.Add("play", "", 0.1f, 0, 1, 2, 3);
         Sprite.CenterOrigin();
         Sprite.OnFinish = delegate {
             RemoveSelf();
         };
-        base.Depth = -100;
+        base.Depth = 200; // deeper than main slash, player and theoCrystal
     }
 
     public override void Removed(Scene scene) {
         base.Removed(scene);
-        LivingSlashes--;
+        if (LivingSlashes > 0) {
+            LivingSlashes--;
+            // in case LivingSlashes become negative after transition
+        }
     }
 
     public override void Update() {
@@ -52,10 +62,12 @@ public class ExSlash : Entity {
         }
     }
 
-    public static ExSlash Burst(Vector2 position, float direction, Color color, float length = 1f, float delay = 0f, float movingSpeed = 8f) {
-        Scene scene = Engine.Scene;
+    public static ExSlash Burst(Vector2 basePosition, Vector2 position, float direction, Color color, float length = 1f, float delay = 0f, float movingSpeed = 8f) {
         ExSlash slashFx = Engine.Pooler.Create<ExSlash>();
-        scene.Add(slashFx);
+        slashFx.BaseDashCount = DashCount;
+        LivingSlashes++;
+        Engine.Scene.Add(slashFx);
+        slashFx.BasePosition = basePosition;
         slashFx.Position = position;
         slashFx.Direction = Calc.AngleToVector(direction, length);
         if (delay <= 0f) {
@@ -78,37 +90,77 @@ public class ExSlash : Entity {
         return slashFx;
     }
 
-    public static ExSlash ExplosiveRandBurst(Vector2 position, float offset) {
-        ExSlash slash = RandBurst(position, offset);
-        slash.NextGenerationPossibility = SlashDashModule.Settings.f_GenerationRate;
-        SetGeneration(slash);
-        return slash;
+    public static float BaseGenerationRate;
+
+    public static int MaxNextGenerationCount;
+
+    public static int DashCount;
+
+    public static void ExplosiveRandBurst(Vector2 position, float range) {
+        int tryCount = MaxNextGenerationCount;
+
+        for (int i = 1; i <= tryCount; i++) {
+            if (Rand.Rnd.Chance(BaseGenerationRate)) {
+                if (TryRandBurst(position, position, range, out ExSlash slash)) {
+                    slash.Generation = 1;
+                    slash.NextGenerationPossibility = BaseGenerationRate * BaseGenerationRate;
+                    SetGeneration(slash);
+                }
+                else {
+                    break;
+                }
+            }
+        }
+
     }
 
-    public static ExSlash RandBurst(Vector2 position, float offset) {
-        return Burst(position + Rand.Rnd.Range(-Vector2.One / 10f, Vector2.One / 10f) * offset, Rand.Rnd.Range(-MathF.PI, MathF.PI), Rand.GetColor(), Rand.Rnd.Range(0.5f, 6f), Rand.Rnd.Range(0.05f, 0.7f), Rand.Rnd.Range(3f, 120f));
+    public static bool TryRandBurst(Vector2 basePosition, Vector2 position, float rangeOrLerp, out ExSlash slash) {
+        if (LivingSlashes > MaxCapacity) {
+            slash = null;
+            return false;
+        }
+
+        // if var = rangeOrLerp < 1f, then var is the lerp
+        // otherwise, var is the range of random offset
+
+        Vector2 newPosition = rangeOrLerp > 1f ? position + Rand.Rnd.GetDirection(Rand.Rnd.NextFloat(5f * rangeOrLerp)) : Vector2.Lerp(basePosition, position, rangeOrLerp) + Rand.Rnd.GetDirection(Rand.Rnd.NextFloat(200f * rangeOrLerp));
+
+        slash = Burst(basePosition, newPosition, Rand.Rnd.Range(-MathF.PI, MathF.PI), Rand.GetColor(), Rand.Rnd.Range(0.5f, 6f), Rand.Rnd.Range(MinDelay, MaxDelay), Rand.Rnd.Range(3f, 120f));
+        return true;
     }
 
     public static void SetGeneration(ExSlash slash) {
-        if (LivingSlashes > MaxCapacity) {
-            return;
-        }
         slash.Sprite.OnFinish += (_) => {
-            if (Rand.Rnd.Chance(slash.NextGenerationPossibility)) {
-                if (slash.Generation <= 10) {
-                    int tryCount = SlashDashModule.Settings.MaxNextGenerationCount;
-                    for (int i = 1; i <= tryCount; i++) {
-                        ExSlash nextGeneration = RandBurst(slash.Position, slash.MovingSpeed);
-                        nextGeneration.NextGenerationPossibility = slash.NextGenerationPossibility * SlashDashModule.Settings.f_GenerationRate;
-                        nextGeneration.Generation = slash.Generation + 1;
+            slash.GenerateNext();
+        };
+    }
+
+    public void GenerateNext() {
+        if (Generation <= 10) {
+            if (LivingSlashes > MaxNextGenerationCount - 100 && DashCount > BaseDashCount) {
+                // if player dashes again, then make previous slashes disappear as soon as possible so we can create new slashes
+                return;
+            }
+            int tryCount = MaxNextGenerationCount;
+            float localizer = (Position - BasePosition).LengthSquared() > 1E4 * Generation ? Generation / 10f : MovingSpeed;
+            // limit its spread speed, but don't limit too much (otherwise too many slashes on screen)
+            // so they look like a spreading-out storm
+            for (int i = 1; i <= tryCount; i++) {
+                if (Rand.Rnd.Chance(NextGenerationPossibility)) {
+                    if (TryRandBurst(BasePosition, Position, localizer, out ExSlash nextGeneration)) {
+                        nextGeneration.NextGenerationPossibility = NextGenerationPossibility * BaseGenerationRate;
+                        nextGeneration.Generation = Generation + 1;
                         SetGeneration(nextGeneration);
                     }
-                }
-                else {
-                    // wow
+                    else {
+                        break;
+                    }
                 }
             }
-        };
+        }
+        else {
+            // sorry but i will kill you
+        }
     }
 }
 
@@ -129,5 +181,9 @@ internal static class Rand {
             b = 255 - b;
         }
         return new Color(r, g, b);
+    }
+
+    public static Vector2 GetDirection(this Random rand, float length = 1f) {
+        return Calc.AngleToVector(rand.NextFloat() * (MathF.PI * 2f), length);
     }
 }
