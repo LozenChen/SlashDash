@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿//#define LOG
+using Microsoft.Xna.Framework;
 using Monocle;
 
 namespace Celeste.Mod.SlashDash.Module;
@@ -23,6 +24,8 @@ public class ExSlash : Entity {
 
     public int BaseDashCount;
 
+    public bool Generative = false; // make sure if it's set to false whenever it goes out of the pool
+
     public static int LivingSlashes = 0;
 
     public static int MaxCapacity = 4000; // don't set it above 20000
@@ -36,6 +39,9 @@ public class ExSlash : Entity {
         Sprite.CenterOrigin();
         Sprite.OnFinish = delegate {
             RemoveSelf();
+            if (Generative) {
+                GenerateNext();
+            }
         };
         base.Depth = 200; // deeper than main slash, player and theoCrystal
     }
@@ -64,6 +70,7 @@ public class ExSlash : Entity {
 
     public static ExSlash Burst(Vector2 basePosition, Vector2 position, float direction, Color color, float length = 1f, float delay = 0f, float movingSpeed = 8f) {
         ExSlash slashFx = Engine.Pooler.Create<ExSlash>();
+        slashFx.Generative = false;
         slashFx.BaseDashCount = DashCount;
         LivingSlashes++;
         Engine.Scene.Add(slashFx);
@@ -98,7 +105,9 @@ public class ExSlash : Entity {
 
     public static void ExplosiveRandBurst(Vector2 position, float range) {
         int tryCount = MaxNextGenerationCount;
-
+#if LOG
+        Logger.Log("ExSlash", $"MaxCount = {MaxNextGenerationCount}, GenRate = {BaseGenerationRate}");
+#endif
         for (int i = 1; i <= tryCount; i++) {
             if (Rand.Rnd.Chance(BaseGenerationRate)) {
                 if (TryRandBurst(position, position, range, out ExSlash slash)) {
@@ -130,9 +139,11 @@ public class ExSlash : Entity {
     }
 
     public static void SetGeneration(ExSlash slash) {
-        slash.Sprite.OnFinish += (_) => {
-            slash.GenerateNext();
-        };
+        slash.Generative = true;
+        // previously we do slash.Sprite.OnFinish += ...
+        // this leads to that: if the entity goes into the pool and out for too many times
+        // then slash.Sprite.OnFinish has too many things
+        // making the number of slashes grow dramatically
     }
 
     public void GenerateNext() {
@@ -141,6 +152,9 @@ public class ExSlash : Entity {
                 // if player dashes again, then make previous slashes disappear as soon as possible so we can create new slashes
                 return;
             }
+#if LOG
+            Logger.Log("ExSlash", $"LivingSlashes = {LivingSlashes}, GenRate = {NextGenerationPossibility}");
+#endif
             int tryCount = MaxNextGenerationCount;
             float localizer = (Position - BasePosition).LengthSquared() > 1E4 * Generation ? Generation / 10f : MovingSpeed;
             // limit its spread speed, but don't limit too much (otherwise too many slashes on screen)
@@ -165,7 +179,7 @@ public class ExSlash : Entity {
 }
 
 internal static class Rand {
-    public static Random Rnd = new Random();
+    public static Random Rnd;
 
     public static void SetSeed(int seed) {
         Rnd = new Random(seed);

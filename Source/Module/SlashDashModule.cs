@@ -34,6 +34,7 @@ public class SlashDashModule : EverestModule {
 
     public override void Initialize() {
         typeof(Player).GetMethod("DashCoroutine", BindingFlags.NonPublic | BindingFlags.Instance).GetStateMachineTarget().IlHook(IL_Player_DashCoroutine);
+        Rand.Rnd = new();
     }
 
     public override void LoadSettings() {
