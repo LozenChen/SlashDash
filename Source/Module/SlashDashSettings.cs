@@ -1,3 +1,5 @@
+using YamlDotNet.Serialization;
+
 namespace Celeste.Mod.SlashDash.Module;
 
 [SettingName("Slash Dash")]
@@ -14,7 +16,20 @@ public class SlashDashSettings : EverestModuleSettings {
         ExSlash.MaxNextGenerationCount = MaxNextGenerationCount;
     }
 
-    public bool Enabled { get; set; } = true;
+    [YamlMember(Alias = "Enabled")]
+
+    public bool enabled = true;
+
+    [YamlIgnore]
+    public bool Enabled {
+        get => (SlashDashSession.Instance?.OverrideEnabled).GetValueOrDefault(enabled);
+        set {
+            enabled = value;
+            if (SlashDashSession.Instance is { } instance) {
+                instance.OverrideEnabled = null;
+            }
+        }
+    }
 
     [SettingRange(1, 40)]
     public int MainSlashLength { get; set; } = 10;

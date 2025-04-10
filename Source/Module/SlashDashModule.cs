@@ -18,6 +18,8 @@ public class SlashDashModule : EverestModule {
 
     public override Type SettingsType => typeof(SlashDashSettings);
 
+    public override Type SessionType => typeof(SlashDashSession);
+
     public override void Load() {
         Everest.Events.Level.OnLoadLevel += Level_OnLoadLevel;
     }
